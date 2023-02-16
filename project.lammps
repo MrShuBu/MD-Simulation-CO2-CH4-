@@ -1,0 +1,82 @@
+# ---------------------	Initialization
+
+units real
+boundary p p p
+atom_style full
+
+# --------------------- System definition
+
+read_data mixture.data
+# need to test whether coul/cut runs properly for a system of molecules
+# pair_style lj/cut/coul/cut 12.0
+pair_style lj/cut 6.0
+bond_style harmonic
+angle_style harmonic
+# need to test whether tail is necessary while running simulations using NPT
+# pair_modify mix geometric shift yes tail yes
+pair_modify mix geometric shift yes
+
+# ---------------------	Simulation settings
+
+# other non-bonded interactions will be inferred from mixing
+pair_coeff 1 1 0.0951 3.47299 # C
+pair_coeff 2 2 0.03801999 3.1597055 # H
+pair_coeff 3 3 0.0957 3.033153 # O
+bond_coeff 1 350.0 1.09 # C-H
+bond_coeff 2 350.0 1.152 # C-O
+angle_coeff 1 50.0 109.471 # H-C-H
+angle_coeff 2 50.0 180.0 # O-C-O
+neighbor 3.0 bin
+neigh_modify delay 10 check yes
+
+# ---------------------	Minimization
+
+timestep 1.0
+thermo 100
+velocity all create 100.0 69420 dist gaussian mom yes rot yes
+minimize 1.0e-8 1.0e-8 10000 100000
+# extra simulation to reduce symmetries and overlap if necessary
+# fix sim0 all nve
+# run 1000
+# unfix sim0
+reset_timestep 0
+
+# ---------------------	Simulation #1 (T = 325 K, P = 180 atm)
+
+compute fun1cc all rdf 1000 1 1 cutoff 6.0 # C-C
+fix fun1cc all ave/time 100 100 10000 c_fun1cc[*] file hcg_1cc.rdf mode vector
+compute fun1ch all rdf 1000 1 2 cutoff 6.0 # C-H
+fix fun1ch all ave/time 100 100 10000 c_fun1ch[*] file hcg_1ch.rdf mode vector
+compute fun1co all rdf 1000 1 3 cutoff 6.0 # C-O
+fix fun1co all ave/time 100 100 10000 c_fun1co[*] file hcg_1co.rdf mode vector
+compute fun1hh all rdf 1000 2 2 cutoff 6.0 # H-H
+fix fun1hh all ave/time 100 100 10000 c_fun1hh[*] file hcg_1hh.rdf mode vector
+compute fun1ho all rdf 1000 2 3 cutoff 6.0 # C-O
+fix fun1ho all ave/time 100 100 10000 c_fun1ho[*] file hcg_1ho.rdf mode vector
+compute fun1oo all rdf 1000 3 3 cutoff 6.0 # O-O
+fix fun1oo all ave/time 100 100 10000 c_fun1oo[*] file hcg_1oo.rdf mode vector
+dump dat1 all atom 1000 hcg_1.lammpstrj
+fix sim1 all npt temp 325 325 100 iso 180 180 10000
+run 50000
+unfix sim1
+
+# ---------------------	Simulation #2 (T = 300 K, P = 1 atm)
+
+# need to test simulation using just 1 RDF first
+# compute fun2cc all rdf 1000 1 1 cutoff 6.0 # C-C
+# fix fun2cc all ave/time 100 100 10000 c_fun2cc[*] file hcg_2cc.rdf mode vector
+# compute fun2ch all rdf 1000 1 2 cutoff 6.0 # C-H
+# fix fun2ch all ave/time 100 100 10000 c_fun2ch[*] file hcg_2ch.rdf mode vector
+# compute fun2co all rdf 1000 1 3 cutoff 6.0 # C-O
+# fix fun2co all ave/time 100 100 10000 c_fun2co[*] file hcg_2co.rdf mode vector
+# compute fun2hh all rdf 1000 2 2 cutoff 6.0 # H-H
+# fix fun2hh all ave/time 100 100 10000 c_fun2hh[*] file hcg_2hh.rdf mode vector
+# compute fun2ho all rdf 1000 2 3 cutoff 6.0 # C-O
+# fix fun2ho all ave/time 100 100 10000 c_fun2ho[*] file hcg_2ho.rdf mode vector
+# compute fun2oo all rdf 1000 3 3 cutoff 6.0 # O-O
+# fix fun2oo all ave/time 100 100 10000 c_fun2oo[*] file hcg_2oo.rdf mode vector
+dump dat2 all atom 1000 hcg_2.lammpstrj
+fix sim2 all npt temp 325 325 100 iso 1 1 10000
+run 50000
+unfix sim2
+write_data finalmix.data
